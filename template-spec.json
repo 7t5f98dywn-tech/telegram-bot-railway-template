@@ -1,0 +1,71 @@
+{
+  "$comment": "Machine-readable spec for composing this template in Railway's template composer. Mirrors services/*.env.template. Not an official Railway schema — use it as the source of truth when clicking through the composer (see RAILWAY-PUBLISH-GUIDE.md).",
+  "name": "Telegram Bot Starter Kit (Python)",
+  "description": "Production-ready Python Telegram bot starter: aiogram 3 webhook mode on aiohttp, secret-token validation, optional Postgres persistence, healthcheck, JSON logs, graceful shutdown. No long-polling — near-zero idle compute.",
+  "category": "Bots",
+  "tags": ["telegram", "bot", "python", "aiogram", "webhook", "starter", "postgres"],
+  "languages": ["python"],
+  "services": [
+    {
+      "name": "bot",
+      "source": {
+        "type": "github_repo",
+        "repo": "<YOUR_GITHUB_ORG>/telegram-bot-kit",
+        "rootDirectory": "/app",
+        "branch": "main"
+      },
+      "build": { "builder": "DOCKERFILE", "dockerfilePath": "Dockerfile" },
+      "deploy": {
+        "healthcheckPath": "/healthz",
+        "healthcheckTimeout": 120,
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 10
+      },
+      "networking": { "public": true, "generateDomain": true },
+      "variables": {
+        "TELEGRAM_BOT_TOKEN": {
+          "value": "",
+          "required": true,
+          "userSupplied": true,
+          "description": "Telegram bot token from @BotFather. Open https://t.me/BotFather, send /newbot, follow the prompts, then paste the token here (looks like 123456789:AAH8x...)."
+        },
+        "WEBHOOK_SECRET": {
+          "value": "${{ secret(32) }}",
+          "required": true,
+          "userSupplied": false,
+          "description": "Random secret sent by Telegram in the X-Telegram-Bot-Api-Secret-Token header on every webhook request. The bot rejects requests without it. Auto-generated — do not change."
+        },
+        "DATABASE_URL": {
+          "value": "${{ Postgres.DATABASE_URL }}",
+          "required": false,
+          "userSupplied": false,
+          "description": "Postgres connection string over Railway's private network. Remove this variable (and the Postgres service) to run stateless with in-memory storage."
+        },
+        "LOG_LEVEL": {
+          "value": "INFO",
+          "required": false,
+          "userSupplied": false,
+          "description": "Python logging level: DEBUG, INFO, WARNING, ERROR."
+        }
+      }
+    },
+    {
+      "name": "Postgres",
+      "optional": true,
+      "source": { "type": "docker_image", "image": "ghcr.io/railwayapp-templates/postgres-ssl:17" },
+      "networking": { "public": false },
+      "volumes": [{ "mountPath": "/var/lib/postgresql/data" }],
+      "variables": {
+        "PGDATA": { "value": "/var/lib/postgresql/data/pgdata" },
+        "POSTGRES_USER": { "value": "postgres" },
+        "POSTGRES_PASSWORD": { "value": "${{ secret(32) }}" },
+        "POSTGRES_DB": { "value": "railway" },
+        "SSL_CERT_DAYS": { "value": "820" },
+        "DATABASE_URL": {
+          "value": "postgresql://${{ POSTGRES_USER }}:${{ POSTGRES_PASSWORD }}@${{ RAILWAY_PRIVATE_DOMAIN }}:5432/${{ POSTGRES_DB }}",
+          "description": "Referenced by the bot service as ${{ Postgres.DATABASE_URL }}."
+        }
+      }
+    }
+  ]
+}
